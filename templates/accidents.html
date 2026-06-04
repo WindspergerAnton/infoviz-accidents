@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>InfoVis VU 2026 - Accidents</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/style.css') }}">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #models_container { display: flex; gap: 24px; flex-wrap: wrap; margin: 20px 0; }
+        .model_card { border: 1px solid #ccc; border-radius: 6px; padding: 16px; min-width: 280px; }
+        .model_card h3 { margin: 0 0 6px 0; }
+        .best { border: 2px solid #388e3c; background: #f1f8f1; }
+        .f1_total { font-size: 1.1em; font-weight: bold; margin-bottom: 10px; }
+        table { border-collapse: collapse; margin-bottom: 10px; }
+        td, th { border: 1px solid #ccc; padding: 5px 10px; text-align: center; font-size: 0.82em; }
+        th { background: #f0f0f0; }
+        .section_label { font-weight: bold; margin: 10px 0 4px 0; font-size: 0.85em; color: #555; }
+        #error_map { margin: 20px 0; }
+        #error_map svg { border: 1px solid #ccc; }
+        .legend { display: flex; gap: 16px; margin: 8px 0; font-size: 0.9em; }
+        .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+
+<h1>InfoVis VU 2026 - Exercise 2</h1>
+<p>Group 52 – Road Accident Severity Prediction</p>
+
+<h2>Model Comparison</h2>
+<div id="models_container"></div>
+
+<h2>Prediction Error Map <small style="font-size:0.6em; color:#555">(best model)</small></h2>
+<div class="legend">
+    <div><span style="background:green"></span>Correct</div>
+    <div><span style="background:red"></span>Wrong</div>
+</div>
+<div id="error_map">
+    <svg id="svg_error_map" width="620" height="420"></svg>
+</div>
+
+<script>
+    const rf = {{ rf | safe }};
+    const classes = rf.classes;
+    const bestF1 = Math.max(...rf.models.map(m => m.f1));
+
+    // ── Model cards ────────────────────────────────────────────────────────────
+    const container = d3.select('#models_container');
+
+    rf.models.forEach(model => {
+        const isBest = model.f1 === bestF1;
+        const card = container.append('div')
+            .attr('class', 'model_card' + (isBest ? ' best' : ''));
+
+        card.append('h3').text(model.name + (isBest ? ' ★' : ''));
+        card.append('div').attr('class', 'f1_total').text(`Weighted F1: ${model.f1}`);
+
+        // Confusion matrix
+        card.append('div').attr('class', 'section_label').text('Confusion Matrix');
+        const cmTable = card.append('table');
+        const header = cmTable.append('thead').append('tr');
+        header.append('th').text('Actual \\ Pred');
+        classes.forEach(c => header.append('th').text(c));
+        const tbody = cmTable.append('tbody');
+        model.confusion_matrix.forEach((row, i) => {
+            const tr = tbody.append('tr');
+            tr.append('th').text(classes[i]);
+            row.forEach((val, j) => {
+                tr.append('td')
+                  .style('background', i === j ? '#c8e6c9' : (val > 0 ? '#ffcdd2' : 'white'))
+                  .text(val);
+            });
+        });
+
+        // Per-class metrics
+        card.append('div').attr('class', 'section_label').text('Per-Class Metrics');
+        const pcTable = card.append('table');
+        const pcHead = pcTable.append('thead').append('tr');
+        ['Class', 'Precision', 'Recall', 'F1'].forEach(h => pcHead.append('th').text(h));
+        const pcBody = pcTable.append('tbody');
+        classes.forEach(c => {
+            const m = model.per_class[c];
+            const tr = pcBody.append('tr');
+            tr.append('td').text(c);
+            tr.append('td').text(m.precision);
+            tr.append('td').text(m.recall);
+            tr.append('td').text(m.f1);
+        });
+    });
+
+    // ── Error Map ──────────────────────────────────────────────────────────────
+    const svg = d3.select('#svg_error_map');
+    const width = +svg.attr('width');
+    const height = +svg.attr('height');
+    const points = rf.error_map;
+
+    const xScale = d3.scaleLinear().domain(d3.extent(points, p => p.longitude)).range([20, width - 20]);
+    const yScale = d3.scaleLinear().domain(d3.extent(points, p => p.latitude)).range([height - 20, 20]);
+
+    svg.selectAll('circle')
+       .data(points)
+       .join('circle')
+       .attr('cx', d => xScale(d.longitude))
+       .attr('cy', d => yScale(d.latitude))
+       .attr('r', 2)
+       .attr('fill', d => d.correct ? 'green' : 'red')
+       .attr('opacity', 0.4);
+</script>
+
+</body>
+</html>
