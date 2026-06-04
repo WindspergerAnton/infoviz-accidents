@@ -1,7 +1,9 @@
 """
 data_loading.py  –  Group 52, InfoViz SS 2026
 Run once: python data_loading.py
-Output:   static/data/accidents_clean.csv
+Output:
+  static/data/accidents_clean.csv       – alle Unfälle mit Features
+  static/data/severity_by_region.csv    – Severity Index aggregiert pro Region (für Olenas Karte)
 """
 
 import pandas as pd
@@ -27,7 +29,6 @@ guide = pd.read_excel(
 for field, group in guide.groupby("field name"):
     if field not in df.columns:
         continue
-    
     if not pd.api.types.is_numeric_dtype(df[field]):
         continue
     mapping = {int(r["code/format"]): r["label"] for _, r in group.iterrows()
@@ -39,6 +40,7 @@ df["hour"] = pd.to_datetime(df["time"], format="%H:%M", errors="coerce").dt.hour
 
 df = df.dropna(subset=["latitude", "longitude"])
 
+# Severity score: slight=1, serious=3, fatal=10 (für Aggregation und Modell)
 severity_map = {"Slight": 1, "Serious": 3, "Fatal": 10}
 df["severity_score"] = df["collision_severity"].map(severity_map).fillna(1)
 
@@ -59,4 +61,23 @@ df["road_type_simple"] = df["first_road_class"].apply(simplify_road)
 
 out = DATA_DIR / "accidents_clean.csv"
 df.to_csv(out, index=False)
-print(f"Saved {len(df):,} rows → {out}")
+print(f"Saved accidents_clean.csv → {len(df):,} rows")
+
+collisions_only = df.drop_duplicates(subset=["collision_index"])
+
+region_stats = collisions_only.groupby("police_force").agg(
+    total_accidents  = ("collision_index", "count"),
+    severity_index   = ("severity_score", "sum"),
+    fatal_count      = ("collision_severity", lambda x: (x == "Fatal").sum()),
+    serious_count    = ("collision_severity", lambda x: (x == "Serious").sum()),
+    slight_count     = ("collision_severity", lambda x: (x == "Slight").sum()),
+).reset_index()
+
+region_stats["severity_index_per_1000"] = (
+    region_stats["severity_index"] / region_stats["total_accidents"] * 1000
+).round(2)
+
+out_region = DATA_DIR / "severity_by_region.csv"
+region_stats.to_csv(out_region, index=False)
+print(f"Saved severity_by_region.csv → {len(region_stats)} regions")
+print(region_stats.sort_values("severity_index_per_1000", ascending=False).head(5).to_string(index=False))
