@@ -1,4 +1,6 @@
 import pandas as pd
+import json
+from pathlib import Path
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
@@ -15,6 +17,9 @@ NUMERIC_FEATURES = ['speed_limit', 'hour', 'is_dark', 'is_bad_weather', 'number_
 CATEGORICAL_FEATURES = ['road_type_simple', 'urban_or_rural_area', 'junction_detail']
 
 ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+
+MODELS_DIR = Path("static/models")
+RESULTS_FILE = MODELS_DIR / "model_results.json"
 
 def load_accidents():
     df = pd.read_csv('static/data/accidents_clean.csv', low_memory=False)
@@ -112,3 +117,21 @@ def compute_models(df):
         'classes': classes,
         'error_map': best_error_map,
     }
+
+def save_results(results):
+    """Save training results to JSON file."""
+    MODELS_DIR.mkdir(exist_ok=True)
+    with open(RESULTS_FILE, 'w') as f:
+        json.dump(results, f)
+    print(f"Saved results to {RESULTS_FILE}")
+
+
+def load_results():
+    """Load previously saved training results from JSON file."""
+    if not RESULTS_FILE.exists():
+        raise FileNotFoundError(
+            f"No saved model results found at {RESULTS_FILE}. "
+            f"Run 'python train_models.py' first to train and save models."
+        )
+    with open(RESULTS_FILE, 'r') as f:
+        return json.load(f)

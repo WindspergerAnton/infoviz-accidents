@@ -79,5 +79,62 @@ region_stats["severity_index_per_1000"] = (
 
 out_region = DATA_DIR / "severity_by_region.csv"
 region_stats.to_csv(out_region, index=False)
-print(f"Saved severity_by_region.csv → {len(region_stats)} regions")
-print(region_stats.sort_values("severity_index_per_1000", ascending=False).head(5).to_string(index=False))
+
+# ── Monthly aggregation for time series ──────────────────────────────
+print("Building monthly aggregation...")
+
+df_collisions_only = df.drop_duplicates(subset=["collision_index"]).copy()
+df_collisions_only["month"] = df_collisions_only["date"].dt.to_period("M").astype(str)
+
+monthly_stats = df_collisions_only.groupby("month").agg(
+    total_accidents = ("collision_index", "count"),
+    fatal_count     = ("collision_severity", lambda x: (x == "Fatal").sum()),
+    serious_count   = ("collision_severity", lambda x: (x == "Serious").sum()),
+    slight_count    = ("collision_severity", lambda x: (x == "Slight").sum()),
+    severity_index  = ("severity_score", "sum"),
+).reset_index()
+
+monthly_stats = monthly_stats.sort_values("month")
+out_monthly = DATA_DIR / "accidents_monthly.csv"
+monthly_stats.to_csv(out_monthly, index=False)
+print(f"Saved accidents_monthly.csv → {len(monthly_stats)} months")
+
+# ── Region × Month aggregation (for linked choropleth + time series) ─
+print("Building region × month aggregation...")
+
+region_monthly = df_collisions_only.groupby(["police_force", "month"]).agg(
+    total_accidents = ("collision_index", "count"),
+    severity_index  = ("severity_score", "sum"),
+    fatal_count     = ("collision_severity", lambda x: (x == "Fatal").sum()),
+    serious_count   = ("collision_severity", lambda x: (x == "Serious").sum()),
+    slight_count    = ("collision_severity", lambda x: (x == "Slight").sum()),
+).reset_index()
+
+region_monthly["severity_index_per_1000"] = (
+    region_monthly["severity_index"] / region_monthly["total_accidents"] * 1000
+).round(2)
+
+out_rm = DATA_DIR / "region_monthly.csv"
+region_monthly.to_csv(out_rm, index=False)
+print(f"Saved region_monthly.csv → {len(region_monthly)} rows")
+
+# ── Accident points JSON (for zoomed-in map markers) ─────────────────
+print("Building accident points JSON...")
+
+fatal   = collisions_only[collisions_only["collision_severity"] == "Fatal"]
+serious = collisions_only[collisions_only["collision_severity"] == "Serious"]
+slight  = collisions_only[collisions_only["collision_severity"] == "Slight"].sample(n=5000, random_state=42)
+
+pts = pd.concat([fatal, serious, slight])
+pts = pts[["location_easting_osgr", "location_northing_osgr",
+           "collision_severity", "date", "speed_limit",
+           "weather_conditions", "light_conditions", "road_type",
+           "police_force"]].dropna(subset=["location_easting_osgr", "location_northing_osgr"]).copy()
+
+pts.columns = ["easting", "northing", "severity", "date", "speed_limit",
+               "weather", "light", "road_type", "police_force"]
+pts["date"] = pts["date"].dt.strftime("%Y-%m-%d")
+
+out_pts = DATA_DIR / "accident_points.json"
+pts.to_json(out_pts, orient="records")
+print(f"Saved accident_points.json → {len(pts)} points ({out_pts.stat().st_size / 1024:.0f} KB)")

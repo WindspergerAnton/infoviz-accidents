@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>UK Road Accidents - Interactive Map</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.0/topojson.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        
+        .map-container {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 10px;
+        }
+        
+        .stats-panel {
+            min-width: 220px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+        
+        .stats-panel h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        
+        .stats-panel .stat {
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        
+        .stats-panel .stat strong {
+            display: inline-block;
+            min-width: 130px;
+        }
+        
+        .timeseries-container {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 10px;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .brush .selection {
+            fill: steelblue;
+            fill-opacity: 0.2;
+            stroke: steelblue;
+        }
+        
+        h2 { margin: 10px 0 5px 0; font-size: 14px; color: #333; }
+        
+        .region-path { cursor: pointer; }
+        
+        .dot-legend { margin-top: 6px; font-size: 11px; display: flex; gap: 12px; }
+        .dot-legend span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+        
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: steelblue;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+<h1>InfoVis VU 2026 – UK Road Accidents</h1>
+<a class="nav-link" href="/accidents">← Back to Model Comparison</a>
+
+<div class="main-layout">
+    <!-- LEFT: Choropleth Map -->
+    <div class="map-container">
+        <h2>Severity by Police Force Region 
+            <small style="font-size:11px; color:#666">— scroll to zoom, drag to pan, click a region to focus</small>
+        </h2>
+        <button id="btn_reset_zoom" style="display:none; margin-bottom:6px; padding:4px 12px; font-size:12px; cursor:pointer; border:1px solid #999; border-radius:4px; background:#f5f5f5;">
+            ← Back to overview
+        </button>
+        <svg id="svg_map"></svg>
+        <div id="map_legend"></div>
+        <div class="dot-legend">
+            <div><span style="background:#d32f2f"></span>Fatal</div>
+            <div><span style="background:#ff9800"></span>Serious</div>
+            <div><span style="background:#4caf50"></span>Slight</div>
+        </div>
+    </div>
+    
+    <!-- RIGHT: Stats Panel -->
+    <div class="stats-panel">
+        <h3>Selected Period</h3>
+        <div id="stats_content"></div>
+    </div>
+</div>
+
+<!-- BOTTOM: Time Series -->
+<div class="timeseries-container">
+    <h2>Monthly Accidents 
+        <small style="font-size:11px; color:#666">
+            — drag horizontally to select a time range
+        </small>
+    </h2>
+    <div id="svg_timeseries"></div>
+</div>
+
+<!-- Tooltip (hidden until hover) -->
+<div id="tooltip" class="tooltip"></div>
+
+<!-- Load JavaScript files -->
+<script src="{{ url_for('static', filename='js/choropleth.js') }}"></script>
+<script src="{{ url_for('static', filename='js/timeseries.js') }}"></script>
+
+<script>
+    // Data passed from Flask via Jinja2
+    const regionData = {{ region_data | safe }};
+    const monthlyData = {{ monthly_data | safe }};
+    const _regionMonthlyData = {{ region_monthly_data | safe }};
+    
+    // Initialize both charts (pass region×month data for linked views)
+    initChoropleth(regionData, _regionMonthlyData);
+    initTimeSeries(monthlyData);
+    
+    // Show initial stats (all months)
+    updateChoroplethByMonths(null);
+</script>
+
+</body>
+</html>
