@@ -5,124 +5,72 @@
     <title>UK Road Accidents - Interactive Map</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.0/topojson.min.js"></script>
-    <style>
-        body { font-family: sans-serif; margin: 20px; }
-        
-        .main-layout {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-        }
-        
-        .map-container {
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            padding: 10px;
-        }
-        
-        .stats-panel {
-            min-width: 220px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            padding: 15px;
-            background: #f9f9f9;
-        }
-        
-        .stats-panel h3 {
-            margin: 0 0 10px 0;
-            font-size: 14px;
-        }
-        
-        .stats-panel .stat {
-            margin: 8px 0;
-            font-size: 13px;
-        }
-        
-        .stats-panel .stat strong {
-            display: inline-block;
-            min-width: 130px;
-        }
-        
-        .timeseries-container {
-            margin-top: 20px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            padding: 10px;
-        }
-        
-        .tooltip {
-            position: absolute;
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 8px 12px;
-            font-size: 12px;
-            pointer-events: none;
-            display: none;
-            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
-            z-index: 1000;
-        }
-        
-        .brush .selection {
-            fill: steelblue;
-            fill-opacity: 0.2;
-            stroke: steelblue;
-        }
-        
-        h2 { margin: 10px 0 5px 0; font-size: 14px; color: #333; }
-        
-        .region-path { cursor: pointer; }
-        
-        .dot-legend { margin-top: 6px; font-size: 11px; display: flex; gap: 12px; }
-        .dot-legend span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
-        
-        .nav-link {
-            display: inline-block;
-            margin-bottom: 15px;
-            color: steelblue;
-            text-decoration: none;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/style.css') }}">
 </head>
 <body>
-
-<h1>InfoVis VU 2026 – UK Road Accidents</h1>
-<a class="nav-link" href="/accidents">← Back to Model Comparison</a>
-<a class="nav-link" href="/dashboard">→ Dashboard</a>
-
-<div class="main-layout">
-    <!-- LEFT: Choropleth Map -->
-    <div class="map-container">
-        <h2>Severity by Police Force Region 
-            <small style="font-size:11px; color:#666">— scroll to zoom, drag to pan, click a region to focus</small>
-        </h2>
-        <button id="btn_reset_zoom" style="display:none; margin-bottom:6px; padding:4px 12px; font-size:12px; cursor:pointer; border:1px solid #999; border-radius:4px; background:#f5f5f5;">
-            ← Back to overview
-        </button>
-        <svg id="svg_map"></svg>
-        <div id="map_legend"></div>
-        <div class="dot-legend">
-            <div><span style="background:#d32f2f"></span>Fatal</div>
-            <div><span style="background:#ff9800"></span>Serious</div>
-            <div><span style="background:#4caf50"></span>Slight</div>
+<div class="page-shell">
+    <header class="top-bar">
+        <div class="brand">
+            <p class="eyebrow">Interactive dashboard</p>
+            <h1>UK Road Accidents</h1>
+            <p class="lede">Explore severity by police force, compare monthly trends, and drill into the most affected areas.</p>
         </div>
-    </div>
-    
-    <!-- RIGHT: Stats Panel -->
-    <div class="stats-panel">
-        <h3>Selected Period</h3>
-        <div id="stats_content"></div>
-    </div>
-</div>
+        <nav class="link-row">
+            <a class="nav-link" href="/accidents">← Back to model comparison</a>
+            <a class="nav-link" href="/dashboard">→ Dashboard</a>
+        </nav>
+    </header>
 
-<!-- BOTTOM: Time Series -->
-<div class="timeseries-container">
-    <h2>Monthly Accidents 
-        <small style="font-size:11px; color:#666">
-            — drag horizontally to select a time range
-        </small>
-    </h2>
-    <div id="svg_timeseries"></div>
+    <section class="dashboard-grid">
+        <!-- LEFT: Choropleth Map -->
+        <article class="map-card map-container">
+            <div class="card-head">
+                <div>
+                    <p class="eyebrow">Map view</p>
+                    <h2>Severity by Police Force Region</h2>
+                    <p class="subtle">Ctrl + scroll to zoom, drag to pan, and click a region to focus.</p>
+                </div>
+                <div class="chip-row">
+                    <button id="btn_reset_zoom" class="ghost-button" style="display:none;">← Back to overview</button>
+                    <span id="zoom-level" class="zoom-chip">Overview</span>
+                </div>
+            </div>
+            <svg id="svg_map"></svg>
+            <div class="legend-wrap">
+                <div class="legend-title-row">
+                    <h3>Severity index</h3>
+                    <span>Low → High</span>
+                </div>
+                <div id="map_legend"></div>
+            </div>
+            <div class="dot-legend">
+                <div><span style="background:#d32f2f"></span>Fatal</div>
+                <div><span style="background:#ff9800"></span>Serious</div>
+                <div><span style="background:#4caf50"></span>Slight</div>
+            </div>
+        </article>
+
+        <!-- RIGHT: Stats Panel -->
+        <aside class="stats-panel sidebar-card">
+            <p class="eyebrow">Selected period</p>
+            <h3>Live summary</h3>
+            <p class="subtle">Brush the time series to update the choropleth and the summary cards.</p>
+            <div id="stats_content"></div>
+        </aside>
+    </section>
+
+    <!-- BOTTOM: Time Series -->
+    <section class="timeseries-card timeseries-container">
+        <div class="card-head">
+            <div>
+                <p class="eyebrow">Trend view</p>
+                <h2>Monthly Accidents</h2>
+                <p class="subtle">Drag horizontally to select a time range and highlight the map.</p>
+            </div>
+            <span class="zoom-chip">Brush enabled</span>
+        </div>
+        <div id="svg_timeseries"></div>
+    </section>
 </div>
 
 <!-- Tooltip (hidden until hover) -->
@@ -138,11 +86,9 @@
     const monthlyData = {{ monthly_data | safe }};
     const _regionMonthlyData = {{ region_monthly_data | safe }};
     
-    // Initialize both charts (pass region×month data for linked views)
     initChoropleth(regionData, _regionMonthlyData);
     initTimeSeries(monthlyData);
     
-    // Show initial stats (all months)
     updateChoroplethByMonths(null);
 </script>
 

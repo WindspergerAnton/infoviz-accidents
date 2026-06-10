@@ -6,29 +6,69 @@
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/style.css') }}">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 20px; }
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(180deg, #f5faff 0%, #edf3f9 100%);
+            color: #17324d;
+        }
+        .page-wrap { max-width: 1400px; margin: 0 auto; }
+        .page-header {
+            background: rgba(255,255,255,0.92);
+            border: 1px solid rgba(15,23,42,0.08);
+            border-radius: 18px;
+            padding: 18px 18px 12px;
+            box-shadow: 0 10px 28px rgba(15,23,42,0.08);
+            margin-bottom: 18px;
+        }
+        .page-header h1 { margin: 0 0 4px; color: #102538; }
+        .page-header p { color: #52657a; margin: 0 0 8px; }
+        .nav-link {
+            display: inline-block;
+            margin-right: 10px;
+            color: #2f6fb7;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .nav-link:hover { text-decoration: underline; }
         #models_container { display: flex; gap: 24px; flex-wrap: wrap; margin: 20px 0; }
-        .model_card { border: 1px solid #ccc; border-radius: 6px; padding: 16px; min-width: 280px; }
-        .model_card h3 { margin: 0 0 6px 0; }
-        .best { border: 2px solid #388e3c; background: #f1f8f1; }
-        .f1_total { font-size: 1.1em; font-weight: bold; margin-bottom: 10px; }
-        table { border-collapse: collapse; margin-bottom: 10px; }
-        td, th { border: 1px solid #ccc; padding: 5px 10px; text-align: center; font-size: 0.82em; }
-        th { background: #f0f0f0; }
-        .section_label { font-weight: bold; margin: 10px 0 4px 0; font-size: 0.85em; color: #555; }
+        .model_card {
+            background: rgba(255,255,255,0.96);
+            border: 1px solid rgba(15,23,42,0.08);
+            border-radius: 16px;
+            padding: 16px;
+            min-width: 300px;
+            box-shadow: 0 10px 26px rgba(15,23,42,0.08);
+        }
+        .model_card h3 { margin: 0 0 6px 0; color: #102538; }
+        .best { border-color: #63b37c; box-shadow: 0 10px 30px rgba(99,179,124,0.14); }
+        .f1_total { font-size: 1.05em; font-weight: 700; margin-bottom: 10px; color: #18406e; }
+        table { border-collapse: collapse; margin-bottom: 10px; width: 100%; }
+        td, th { border: 1px solid #dfe7ef; padding: 5px 10px; text-align: center; font-size: 0.82em; }
+        th { background: #edf5ff; color: #17324d; }
+        .section_label { font-weight: 700; margin: 10px 0 4px 0; font-size: 0.85em; color: #30455f; }
         #error_map { margin: 20px 0; }
-        #error_map svg { border: 1px solid #ccc; display: block; }
-        .region-outline { fill: #eef2f7; stroke: #6a8faf; stroke-width: 1; }
-        .legend { display: flex; gap: 16px; margin: 8px 0; font-size: 0.9em; }
+        #error_map svg {
+            border: 1px solid rgba(15,23,42,0.10);
+            display: block;
+            border-radius: 16px;
+            background: linear-gradient(145deg, #f8fbff 0%, #edf4fb 55%, #e6eef6 100%);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 10px 24px rgba(15,23,42,0.08);
+        }
+        .region-outline { fill: #edf3f9; stroke: #a7bfdc; stroke-width: 1; }
+        .legend { display: flex; gap: 16px; margin: 8px 0; font-size: 0.9em; color: #30455f; }
         .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
     </style>
 </head>
 <body>
-
-<h1>InfoVis VU 2026 - Exercise 2</h1>
-<p>Group 52 – Road Accident Severity Prediction</p>
-<a href="/map" style="display:inline-block;margin-bottom:15px;color:steelblue;text-decoration:none;">→ Interactive Map</a>
-<a href="/dashboard" style="display:inline-block;margin-bottom:15px;color:steelblue;text-decoration:none;">→ Dashboard</a>
+<div class="page-wrap">
+    <div class="page-header">
+        <h1>InfoVis VU 2026 - Exercise 2</h1>
+        <p>Group 52 – Road Accident Severity Prediction</p>
+        <a class="nav-link" href="/map">→ Interactive Map</a>
+        <a class="nav-link" href="/dashboard">→ Dashboard</a>
+    </div>
 
 <h2>Model Comparison</h2>
 <div id="models_container"></div>
@@ -148,5 +188,6 @@
     });
 </script>
 
+</div>
 </body>
 </html>

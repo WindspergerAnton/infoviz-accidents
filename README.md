@@ -54,8 +54,9 @@ An interactive D3.js visualization with two coordinated views:
 
 - **Choropleth map**: shows severity index per 1,000 accidents for each UK police force region, colored on a yellow-to-red scale. Hover for per-region statistics. The GeoJSON (`uk-police.json`) uses EPSG:27700 (British National Grid) coordinates, rendered with `d3.geoIdentity().reflectY(true).fitSize(...)`.
 - **Zoom & individual markers**: scroll wheel to zoom, drag to pan, or click a region to auto-zoom. At zoom level ≥ 2.5×, individual accident dots appear (red = fatal, orange = serious, green = slight) with tooltips showing date, severity, speed limit, weather, lighting, and road type. A "Back to overview" button or double-click resets the view.
-- **Time series chart**: monthly total and fatal accident counts with a **brush selector** — drag horizontally to select a time range.
+- **Time series chart**: monthly accident totals with a **brush selector** — drag horizontally to select a time range. Hovering the chart shows a crosshair and month-by-month severity details, including slight/serious/fatal counts.
 - **Linked views**: brushing the time series filters the `region_monthly.csv` data by selected months, re-aggregates per region using `d3.rollup()`, recolors all map paths with a 300ms transition, and updates both hover tooltips and the stats panel. Clearing the brush resets to overall totals.
+- **Interactive controls**: zoom, pan, region focus, hover insights, and reset-to-overview actions are all part of the main map workflow.
 
 ### `/dashboard` – Heatmap & Parallel Coordinates Dashboard
 A coordinated dashboard for exploring temporal and multivariate accident patterns.

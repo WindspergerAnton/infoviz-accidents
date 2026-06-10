@@ -3,23 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <title>InfoVis Dashboard – Hour×Weekday Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/style.css') }}">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 20px;
-            background: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(180deg, #f5faff 0%, #edf3f9 100%);
+            color: #17324d;
         }
         
         .header {
-            background: white;
+            background: rgba(255,255,255,0.96);
             padding: 20px;
-            margin-bottom: 24px;
-            border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            border-left: 4px solid #2c5aa0;
+            margin: 18px 18px 24px;
+            border-radius: 18px;
+            box-shadow: 0 14px 30px rgba(15,23,42,0.08);
+            border: 1px solid rgba(15,23,42,0.08);
         }
         
         .header h1 {
@@ -43,11 +46,11 @@
         }
         
         .visualization-panel {
-            background: white;
-            border-radius: 6px;
+            background: rgba(255,255,255,0.96);
+            border-radius: 18px;
             padding: 18px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            border-top: 3px solid #2c5aa0;
+            box-shadow: 0 14px 30px rgba(15,23,42,0.08);
+            border: 1px solid rgba(15,23,42,0.08);
             transition: box-shadow 0.3s ease;
         }
         
@@ -139,11 +142,11 @@
         }
         
         .statistics-panel {
-            background: white;
-            border-radius: 6px;
+            background: rgba(255,255,255,0.96);
+            border-radius: 18px;
             padding: 18px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            border-top: 3px solid #2c5aa0;
+            box-shadow: 0 14px 30px rgba(15,23,42,0.08);
+            border: 1px solid rgba(15,23,42,0.08);
         }
         
         .stat-group {

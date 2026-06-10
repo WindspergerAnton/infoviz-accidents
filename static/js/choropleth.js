@@ -2,8 +2,8 @@ let choroplethSvg;
 let allRegionData = [];
 let regionMonthlyData = [];   // per-region per-month rows
 let currentDataMap = null;     // currently active lookup (region name → aggregated row)
-let mapWidth = 550;
-let mapHeight = 600;
+let mapWidth = 760;
+let mapHeight = 520;
 let accidentPoints = null;     // loaded on first region click
 let activeRegion = null;       // currently zoomed region name (null = overview)
 let mapProjection = null;      // stored for projecting accident points
@@ -27,8 +27,15 @@ function initChoropleth(regionData, regionMonthly) {
     // Build initial lookup from overall totals
     currentDataMap = new Map(regionData.map(d => [d.police_force, d]));
 
-    const svg = d3.select("#svg_map")
-        .attr("width", mapWidth)
+    const container = d3.select("#svg_map");
+    const rect = container.node().getBoundingClientRect();
+    mapWidth = Math.max(700, Math.min(1100, rect.width || 760));
+    mapHeight = Math.max(420, Math.min(620, rect.height || 520));
+
+    const svg = container
+        .attr("viewBox", `0 0 ${mapWidth} ${mapHeight}`)
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .attr("width", "100%")
         .attr("height", mapHeight)
         .style("overflow", "hidden");
     choroplethSvg = svg;
@@ -56,6 +63,9 @@ function initChoropleth(regionData, regionMonthly) {
         // Store scale globally so updateChoroplethByMonths can reuse it
         window._mapColorScale = colorScale;
 
+        // Draw regions directly on the card background.
+        // No extra SVG background layer is added here so the map uses one clean surface.
+
         // Draw regions
         svg.append("g")
             .attr("id", "regions-group")
@@ -64,8 +74,9 @@ function initChoropleth(regionData, regionMonthly) {
             .join("path")
             .attr("class", "region-path")
             .attr("d", path)
-            .attr("stroke", "#666")
-            .attr("stroke-width", 0.5)
+            .attr("fill-opacity", 0.95)
+            .attr("stroke", "rgba(233, 243, 255, 0.9)")
+            .attr("stroke-width", 0.9)
             .attr("fill", d => {
                 const row = currentDataMap.get(getRegionName(d));
                 return row ? colorScale(row.severity_index_per_1000) : "#ccc";
@@ -75,8 +86,9 @@ function initChoropleth(regionData, regionMonthly) {
                 const row = currentDataMap.get(name);
                 
                 d3.select(this)
-                    .attr("stroke-width", 2)
-                    .attr("stroke", "#000");
+                    .attr("stroke-width", 1.4)
+                    .attr("stroke", "#244a73")
+                    .attr("filter", "drop-shadow(0 0 2px rgba(36,74,115,0.18))");
                 
                 const tooltip = d3.select("#tooltip");
                 if (row) {
@@ -89,24 +101,25 @@ function initChoropleth(regionData, regionMonthly) {
                         Severity index: ${row.severity_index_per_1000.toFixed(1)}
                     `)
                     .style("display", "block")
-                    .style("left", (event.pageX + 12) + "px")
-                    .style("top", (event.pageY - 10) + "px");
+                    .style("left", (event.clientX + 12) + "px")
+                    .style("top", (event.clientY + 12) + "px");
                 } else {
                     tooltip.html(`<strong>${name}</strong><br/>No data`)
                         .style("display", "block")
-                        .style("left", (event.pageX + 12) + "px")
-                        .style("top", (event.pageY - 10) + "px");
+                        .style("left", (event.clientX + 12) + "px")
+                        .style("top", (event.clientY + 12) + "px");
                 }
             })
             .on("mousemove", function(event) {
                 d3.select("#tooltip")
-                    .style("left", (event.pageX + 12) + "px")
-                    .style("top", (event.pageY - 10) + "px");
+                    .style("left", (event.clientX + 12) + "px")
+                    .style("top", (event.clientY + 12) + "px");
             })
             .on("mouseout", function() {
                 d3.select(this)
-                    .attr("stroke-width", 0.5)
-                    .attr("stroke", "#666");
+                    .attr("stroke-width", 0.9)
+                    .attr("stroke", "rgba(36, 74, 115, 0.35)")
+                    .attr("filter", null);
                 d3.select("#tooltip").style("display", "none");
             })
             .on("click", function(event, d) {
@@ -120,28 +133,58 @@ function initChoropleth(regionData, regionMonthly) {
                 }
             });
 
-        // Points layer (above regions)
+        svg.append("g").attr("id", "pies-group");
         svg.append("g").attr("id", "points-group");
 
-        // ── d3.zoom: scroll to zoom, drag to pan ──────────────────
+        // Precompute region centroids for pie placement
+        const regionCentroids = new Map();
+        features.forEach(d => {
+            regionCentroids.set(getRegionName(d), path.centroid(d));
+        });
+
+        const ZOOM_MID = 2;
+        const ZOOM_DETAIL = 4.5;
+
         const zoom = mapZoom = d3.zoom()
             .scaleExtent([1, 12])
             .translateExtent([[0, 0], [mapWidth, mapHeight]])
+            .filter(function(event) {
+                // Allow drag always; scroll-zoom only with Ctrl held
+                if (event.type === "wheel") return event.ctrlKey;
+                return !event.button; // allow left-click drag
+            })
             .on("zoom", function(event) {
                 const { transform } = event;
+                const k = transform.k;
+
+                // Move all layers together
                 svg.select("#regions-group").attr("transform", transform);
+                svg.select("#pies-group").attr("transform", transform);
                 svg.select("#points-group").attr("transform", transform);
 
-                // Adjust stroke width so borders don't get fat on zoom
+                // Adjust stroke width
                 d3.selectAll(".region-path")
-                    .attr("stroke-width", 0.5 / transform.k);
+                    .attr("stroke-width", 0.8 / k);
 
-                // Show/hide points based on zoom level
-                const ZOOM_THRESHOLD = 2.5;
-                if (transform.k >= ZOOM_THRESHOLD) {
+                // Update zoom level indicator
+                d3.select("#zoom-level").text(
+                    k < ZOOM_MID ? "Overview" :
+                    k < ZOOM_DETAIL ? "Regional" : "Detail"
+                );
+
+                if (k >= ZOOM_DETAIL) {
+                    // ── DETAIL level: individual dots ──
+                    svg.select("#pies-group").selectAll("*").remove();
                     showPointsInView(svg, transform);
-                } else {
+                } else if (k >= ZOOM_MID) {
+                    // ── REGIONAL level: proportional severity pies ──
                     svg.select("#points-group").selectAll("*").remove();
+                    d3.select("#btn_reset_zoom").style("display", "inline-block");
+                    showRegionalPies(svg, transform, regionCentroids);
+                } else {
+                    // ── OVERVIEW level: choropleth only ──
+                    svg.select("#points-group").selectAll("*").remove();
+                    svg.select("#pies-group").selectAll("*").remove();
                     activeRegion = null;
                     d3.selectAll(".region-path").attr("opacity", 1);
                     d3.select("#btn_reset_zoom").style("display", "none");
@@ -150,7 +193,6 @@ function initChoropleth(regionData, regionMonthly) {
 
         svg.call(zoom);
 
-        // Click region → zoom to fit it
         function clickRegion(event, d) {
             event.stopPropagation();
 
@@ -253,8 +295,118 @@ function updateChoroplethByMonths(selectedMonths) {
 }
 
 
-// ── Severity color for individual dots ──────────────────────────────
+// Severity color for pies and dots
 const severityColor = { "Fatal": "#d32f2f", "Serious": "#ff9800", "Slight": "#4caf50" };
+const pieArc = d3.arc().innerRadius(0);
+
+/**
+ * REGIONAL semantic zoom level: proportional pie charts at region centroids.
+ * Size encodes total accidents, slices encode fatal/serious/slight shares.
+ */
+function showRegionalPies(svg, transform, regionCentroids) {
+    d3.select("#btn_reset_zoom").style("display", "inline-block");
+    const k = transform.k;
+
+    const vx0 = -transform.x / k, vy0 = -transform.y / k;
+    const vx1 = (mapWidth - transform.x) / k, vy1 = (mapHeight - transform.y) / k;
+
+    // Find visible regions + their data
+    const visiblePies = [];
+    regionCentroids.forEach((centroid, name) => {
+        const [cx, cy] = centroid;
+        if (cx >= vx0 && cx <= vx1 && cy >= vy0 && cy <= vy1) {
+            const row = currentDataMap.get(name);
+            if (row) {
+                visiblePies.push({ name, cx, cy, row });
+            }
+        }
+    });
+
+    // Radius scale: sqrt of total accidents → area proportional
+    const maxAcc = d3.max(visiblePies, d => d.row.total_accidents) || 1;
+    const rScale = d3.scaleSqrt()
+        .domain([0, maxAcc])
+        .range([3 / k, Math.min(35, 80 / k)]);
+
+    // Fade choropleth to let pies stand out
+    d3.selectAll(".region-path").attr("opacity", 0.35);
+
+    const g = svg.select("#pies-group");
+
+    // Data join on pie groups
+    const pieGroups = g.selectAll(".pie-region")
+        .data(visiblePies, d => d.name);
+
+    pieGroups.exit().remove();
+
+    const enter = pieGroups.enter()
+        .append("g")
+        .attr("class", "pie-region")
+        .attr("transform", d => `translate(${d.cx},${d.cy})`);
+
+    // Merge enter + update
+    const merged = enter.merge(pieGroups)
+        .attr("transform", d => `translate(${d.cx},${d.cy})`);
+
+    // Build pie slices for each region
+    const pie = d3.pie().sort(null).value(d => d.value);
+
+    merged.each(function(d) {
+        const r = rScale(d.row.total_accidents);
+        const slices = [
+            { key: "Fatal",   value: +d.row.fatal_count },
+            { key: "Serious", value: +d.row.serious_count },
+            { key: "Slight",  value: +d.row.slight_count },
+        ];
+
+        const arcs = pie(slices);
+        const arcGen = pieArc.outerRadius(r);
+
+        const paths = d3.select(this).selectAll("path")
+            .data(arcs, dd => dd.data.key);
+
+        paths.enter()
+            .append("path")
+            .attr("d", arcGen)
+            .attr("fill", dd => severityColor[dd.data.key])
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 0.5 / k)
+            .attr("opacity", 0.85)
+          .merge(paths)
+            .attr("d", arcGen)
+            .attr("stroke-width", 0.5 / k);
+
+        paths.exit().remove();
+
+        // Hover on whole pie → tooltip
+        d3.select(this)
+            .style("cursor", "pointer")
+            .on("mouseover", function(event) {
+                d3.select(this).selectAll("path").attr("opacity", 1);
+                d3.select("#tooltip")
+                    .html(`
+                        <strong>${d.name}</strong><br/>
+                        Total: ${d.row.total_accidents.toLocaleString()}<br/>
+                        Fatal: ${(+d.row.fatal_count).toLocaleString()}<br/>
+                        Serious: ${(+d.row.serious_count).toLocaleString()}<br/>
+                        Slight: ${(+d.row.slight_count).toLocaleString()}<br/>
+                        Severity: ${d.row.severity_index_per_1000?.toFixed?.(1) ?? d.row.severity_index_per_1000}
+                    `)
+                    .style("display", "block")
+                    .style("left", (event.clientX + 12) + "px")
+                    .style("top", (event.clientY + 12) + "px");
+            })
+            .on("mousemove", function(event) {
+                d3.select("#tooltip")
+                    .style("left", (event.clientX + 12) + "px")
+                    .style("top", (event.clientY + 12) + "px");
+            })
+            .on("mouseout", function() {
+                d3.select(this).selectAll("path").attr("opacity", 0.85);
+                d3.select("#tooltip").style("display", "none");
+            });
+    });
+}
 
 /**
  * Show accident dots when zoomed in far enough.
@@ -311,13 +463,13 @@ function showPointsInView(svg, transform) {
                                 Road: ${d.road_type}
                             `)
                             .style("display", "block")
-                            .style("left", (event.pageX + 12) + "px")
-                            .style("top", (event.pageY - 10) + "px");
+                            .style("left", (event.clientX + 12) + "px")
+                            .style("top", (event.clientY + 12) + "px");
                     })
                     .on("mousemove", function(event) {
                         d3.select("#tooltip")
-                            .style("left", (event.pageX + 12) + "px")
-                            .style("top", (event.pageY - 10) + "px");
+                            .style("left", (event.clientX + 12) + "px")
+                            .style("top", (event.clientY + 12) + "px");
                     })
                     .on("mouseout", function() {
                         d3.select(this).attr("r", radius).attr("opacity", 0.7);
