@@ -6,6 +6,7 @@
 let pcSvg;
 let pcData = [];
 let pcBrushes = new Map(); // Per-dimension brush selections
+let pcFilteredIndices = new Set(); // Indices of lines that pass the brush filter
 
 const PC_MARGIN = { top: 20, right: 20, bottom: 80, left: 60 };
 const PC_DIMENSIONS = [
@@ -99,9 +100,12 @@ function initParallelCoordinates(data) {
         .attr("stroke-width", 1)
         .attr("opacity", 0.5)
         .on("mouseover", function(event, d) {
-            d3.select(this)
-                .attr("stroke-width", 2)
-                .attr("opacity", 1);
+            // Only highlight if not filtered out
+            if (pcBrushes.size === 0 || pcFilteredIndices.has(data.indexOf(d))) {
+                d3.select(this)
+                    .attr("stroke-width", 2.5)
+                    .attr("opacity", 1);
+            }
 
             const tooltip = d3.select("#pc-tooltip");
             const details = PC_DIMENSIONS
@@ -118,32 +122,79 @@ function initParallelCoordinates(data) {
                 .style("left", (event.pageX + 12) + "px")
                 .style("top", (event.pageY - 10) + "px");
         })
-        .on("mouseout", function() {
-            d3.select(this)
-                .attr("stroke-width", 1)
-                .attr("opacity", 0.5);
+        .on("mouseout", function(event, d) {
+            const dataIndex = data.indexOf(d);
+            const isFiltered = pcFilteredIndices.has(dataIndex);
+            
+            if (pcBrushes.size === 0) {
+                // No brush active: reset to default opacity
+                d3.select(this)
+                    .attr("stroke-width", 1)
+                    .attr("opacity", 0.5);
+            } else {
+                // Brush active: show filtered lines, hide others
+                d3.select(this)
+                    .attr("stroke-width", 1)
+                    .attr("opacity", isFiltered ? 1 : 0.05);
+            }
+            
             d3.select("#pc-tooltip").style("display", "none");
         });
 
     // Add brushes to each axis
     axes.append("g")
         .attr("class", "pc-brush")
-        .each(function(d, i) {
+        .each(function(dim, i) {
             const brush = d3.brushY()
                 .extent([[-10, 0], [10, plotHeight]])
-                .on("start", function() {
-                    d3.selectAll(".pc-path").attr("opacity", 0.1);
-                })
                 .on("brush", function(event) {
-                    if (!event.selection) return;
-                    const [y0, y1] = event.selection;
-                    applyPCBrush(d.key, scales[d.key].invert(y1), scales[d.key].invert(y0));
+                    if (!event.selection) {
+                        pcBrushes.delete(dim.key);
+                    } else {
+                        const [y0, y1] = event.selection;
+                        const val0 = scales[dim.key].invert(y0);
+                        const val1 = scales[dim.key].invert(y1);
+                        const minVal = Math.min(val0, val1);
+                        const maxVal = Math.max(val0, val1);
+                        pcBrushes.set(dim.key, [minVal, maxVal]);
+                    }
+                    
+                    // Update filtered indices
+                    if (pcBrushes.size > 0) {
+                        pcFilteredIndices.clear();
+                        data.forEach((d, idx) => {
+                            let passesAllFilters = true;
+                            for (const [dimKey, range] of pcBrushes) {
+                                if (d[dimKey] == null || d[dimKey] < range[0] || d[dimKey] > range[1]) {
+                                    passesAllFilters = false;
+                                    break;
+                                }
+                            }
+                            if (passesAllFilters) {
+                                pcFilteredIndices.add(idx);
+                            }
+                        });
+                        
+                        // Apply filtering: highlight filtered lines, dim others
+                        d3.selectAll(".pc-path")
+                            .attr("opacity", (d, idx) => pcFilteredIndices.has(idx) ? 1 : 0.05)
+                            .attr("stroke-width", (d, idx) => pcFilteredIndices.has(idx) ? 1.5 : 1);
+                    } else {
+                        pcFilteredIndices.clear();
+                        d3.selectAll(".pc-path")
+                            .attr("opacity", 0.5)
+                            .attr("stroke-width", 1);
+                    }
+                    
+                    triggerPCFilter();
                 })
                 .on("end", function(event) {
                     if (!event.selection) {
                         pcBrushes.clear();
-                        d3.selectAll(".pc-path").attr("opacity", 0.5);
-                        // Trigger reset event
+                        pcFilteredIndices.clear();
+                        d3.selectAll(".pc-path")
+                            .attr("opacity", 0.5)
+                            .attr("stroke-width", 1);
                         triggerPCFilter();
                     }
                 });
@@ -169,31 +220,8 @@ function getLineColor(d) {
     return "#1f77b4"; // Slight
 }
 
-function applyPCBrush(dimension, minVal, maxVal) {
-    pcBrushes.set(dimension, [minVal, maxVal]);
-
-    d3.selectAll(".pc-path")
-        .attr("opacity", d => {
-            for (const [dim, range] of pcBrushes) {
-                if (d[dim] < range[0] || d[dim] > range[1]) {
-                    return 0.1;
-                }
-            }
-            return 0.8;
-        });
-
-    triggerPCFilter();
-}
-
 function triggerPCFilter() {
-    const filteredData = pcData.filter(d => {
-        for (const [dim, range] of pcBrushes) {
-            if (d[dim] < range[0] || d[dim] > range[1]) {
-                return false;
-            }
-        }
-        return true;
-    });
+    const filteredData = pcData.filter((d, idx) => pcFilteredIndices.has(idx));
 
     const event = new CustomEvent("pcFilterChanged", {
         detail: { brushes: Object.fromEntries(pcBrushes), filteredData }
@@ -203,8 +231,11 @@ function triggerPCFilter() {
 
 function resetPCBrushes() {
     pcBrushes.clear();
+    pcFilteredIndices.clear();
     d3.selectAll(".pc-brush").call(d3.brush().clear);
-    d3.selectAll(".pc-path").attr("opacity", 0.5);
+    d3.selectAll(".pc-path")
+        .attr("opacity", 0.5)
+        .attr("stroke-width", 1);
 }
 
 // Listen for heatmap filter events
