@@ -17,7 +17,8 @@
         th { background: #f0f0f0; }
         .section_label { font-weight: bold; margin: 10px 0 4px 0; font-size: 0.85em; color: #555; }
         #error_map { margin: 20px 0; }
-        #error_map svg { border: 1px solid #ccc; }
+        #error_map svg { border: 1px solid #ccc; display: block; }
+        .region-outline { fill: #eef2f7; stroke: #6a8faf; stroke-width: 1; }
         .legend { display: flex; gap: 16px; margin: 8px 0; font-size: 0.9em; }
         .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
     </style>
@@ -38,7 +39,7 @@
     <div><span style="background:red"></span>Wrong</div>
 </div>
 <div id="error_map">
-    <svg id="svg_error_map" width="620" height="420"></svg>
+    <svg id="svg_error_map" width="480" height="560"></svg>
 </div>
 
 <script>
@@ -96,17 +97,55 @@
     const height = +svg.attr('height');
     const points = rf.error_map;
 
-    const xScale = d3.scaleLinear().domain(d3.extent(points, p => p.longitude)).range([20, width - 20]);
-    const yScale = d3.scaleLinear().domain(d3.extent(points, p => p.latitude)).range([height - 20, 20]);
+    // Approximate WGS84 (lon/lat) → EPSG:27700 (easting/northing) for UK
+    // UK bounds: lon [-7.57, 1.76], lat [49.96, 60.86] → OSGB [0..655000, 0..1218000]
+    function wgs84ToOSGB(lon, lat) {
+        const e = (lon + 7.57) / (1.76 + 7.57) * 655000;
+        const n = (lat - 49.96) / (60.86 - 49.96) * 1218000;
+        return [e, n];
+    }
 
-    svg.selectAll('circle')
-       .data(points)
-       .join('circle')
-       .attr('cx', d => xScale(d.longitude))
-       .attr('cy', d => yScale(d.latitude))
-       .attr('r', 2)
-       .attr('fill', d => d.correct ? 'green' : 'red')
-       .attr('opacity', 0.4);
+    d3.json("/static/data/uk-police.json").then(function(uk) {
+        const pad = 40;
+        const projection = d3.geoIdentity()
+            .reflectY(true)
+            .fitExtent([[pad, pad], [width - pad, height - pad]], uk);
+        const path = d3.geoPath().projection(projection);
+
+        // Clip path matching the region outlines — keeps points inside E&W only
+        const defs = svg.append("defs");
+        const clip = defs.append("clipPath").attr("id", "regions-clip");
+        clip.selectAll("path")
+            .data(uk.features)
+            .join("path")
+            .attr("d", path);
+
+        // Draw region outlines as map background
+        svg.append("g")
+            .selectAll("path")
+            .data(uk.features)
+            .join("path")
+            .attr("class", "region-outline")
+            .attr("d", path);
+
+        // Plot error points clipped to the map outline
+        svg.append("g")
+            .attr("clip-path", "url(#regions-clip)")
+            .selectAll('circle')
+            .data(points)
+            .join('circle')
+            .attr('cx', d => {
+                const p = projection(wgs84ToOSGB(d.longitude, d.latitude));
+                return p ? p[0] : -10;
+            })
+            .attr('cy', d => {
+                const p = projection(wgs84ToOSGB(d.longitude, d.latitude));
+                return p ? p[1] : -10;
+            })
+            .attr('r', 2)
+            .attr('fill', d => d.correct ? 'green' : 'red')
+            .attr('opacity', 0.5);
+    });
 </script>
 
 </body>
