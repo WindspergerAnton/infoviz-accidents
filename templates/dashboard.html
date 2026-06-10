@@ -71,14 +71,42 @@
             font-style: italic;
         }
         
-        #heatmap-container, #pc-container {
+        #heatmap-count, #heatmap-severity, #pc-container {
             display: flex;
             justify-content: center;
             overflow-x: auto;
-            min-height: 300px;
             background: #fafafa;
             border-radius: 4px;
             padding: 8px;
+        }
+
+        .tab-bar {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 10px;
+        }
+
+        .tab-btn {
+            padding: 6px 18px;
+            font-size: 13px;
+            font-weight: 500;
+            border: none;
+            border-bottom: 3px solid transparent;
+            background: none;
+            cursor: pointer;
+            color: #888;
+            margin-bottom: -2px;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .tab-btn.active {
+            color: #2c5aa0;
+            border-bottom-color: #2c5aa0;
+            font-weight: 600;
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: #444;
         }
         
         #heatmap-container svg, #pc-container svg {
@@ -201,19 +229,27 @@
 
 <div class="header">
     <h1>InfoVis VU 2026 – UK Road Accidents</h1>
-    <p>Group 52 – Hour × Weekday Patterns with Parallel Coordinates</p>
+    <p>Group 52 – Hour × Weekday Accident Patterns</p>
     <a class="nav-link" href="/map">← Back to Interactive Map</a>
     <a class="nav-link" href="/accidents">→ Model Comparison</a>
 </div>
 
 <div class="dashboard-layout">
-    <!-- LEFT: Heatmap -->
+    <!-- LEFT: Heatmap with tabs -->
     <div class="visualization-panel">
         <h2>Hour × Weekday Heatmap</h2>
+        <div class="tab-bar">
+            <button class="tab-btn" onclick="switchTab('count')">Accident Count</button>
+            <button class="tab-btn active" onclick="switchTab('severity')">Severity</button>
+        </div>
+        <p id="heatmap-description" style="font-style:normal; color:#444; margin-bottom:8px;">
+            Shows how severe accidents are on average across hours of the day and days of the week.
+        </p>
         <p><strong>Interaction:</strong> Click cells to filter | Hover for details</p>
-        <div id="heatmap-container"></div>
+        <div id="heatmap-count" style="display:none"></div>
+        <div id="heatmap-severity"></div>
     </div>
-    
+
     <!-- RIGHT: Parallel Coordinates -->
     <div class="visualization-panel">
         <h2>Parallel Coordinates</h2>
@@ -284,9 +320,8 @@
         }
         
         try {
-            console.log("Calling initHeatmap...");
-            initHeatmap(heatmapData);
-            console.log("Heatmap rendered");
+            initHeatmap(heatmapData, "heatmap-count",    "total_accidents",        "Accidents");
+            initHeatmap(heatmapData, "heatmap-severity", "severity_index_per_1000", "Severity");
         } catch (e) {
             console.error("Heatmap error:", e);
         }
@@ -330,11 +365,25 @@
         document.getElementById("filter-status").textContent = text;
     }
 
+    const heatmapDescriptions = {
+        count:    "Shows how many accidents occur across hours of the day and days of the week.",
+        severity: "Shows how severe accidents are on average across hours of the day and days of the week."
+    };
+
+    function switchTab(tab) {
+        document.getElementById('heatmap-count').style.display    = tab === 'count'    ? 'flex' : 'none';
+        document.getElementById('heatmap-severity').style.display = tab === 'severity' ? 'flex' : 'none';
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.textContent.toLowerCase().includes(tab === 'count' ? 'accident' : 'severity'));
+        });
+        document.getElementById('heatmap-description').textContent = heatmapDescriptions[tab];
+    }
+
     function resetAllFilters() {
         try {
             if (typeof selectedCells !== 'undefined') selectedCells.clear();
             if (typeof pcBrushes !== 'undefined') pcBrushes.clear();
-            d3.selectAll(".heatmap-cell").attr("stroke", "#999").attr("stroke-width", 0.5);
+            d3.selectAll(".heatmap-cell").attr("stroke", "#ccc").attr("stroke-width", 0.5);
             d3.selectAll(".pc-path").attr("opacity", 0.5);
             updateStatistics({{ heatmap_data | safe }});
             updateFilterStatus("No filters active");
