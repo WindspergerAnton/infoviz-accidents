@@ -36,5 +36,33 @@ def map_view():
         region_monthly_data=json.dumps(region_monthly_data)
     )
 
+@app.route('/dashboard')
+def dashboard():
+    """Combined dashboard with Heatmap, Parallel Coordinates, and Map"""
+    
+    # Load heatmap data
+    heatmap_df = pd.read_csv(DATA_DIR / "heatmap_hour_weekday.csv")
+    heatmap_data = heatmap_df.to_dict(orient='records')
+    
+    # Load parallel coordinates data
+    with open(DATA_DIR / "parallel_coordinates.json") as f:
+        pc_data = json.load(f)
+    
+    # Load regional data
+    region_df = pd.read_csv(DATA_DIR / "severity_by_region.csv")
+    region_data = region_df.to_dict(orient='records')
+    
+    # Load monthly data
+    monthly_df = pd.read_csv(DATA_DIR / "accidents_monthly.csv")
+    monthly_data = monthly_df.to_dict(orient='records')
+    
+    return render_template(
+        'dashboard.html',
+        heatmap_data=json.dumps(heatmap_data),
+        pc_data=json.dumps(pc_data),
+        region_data=json.dumps(region_data),
+        monthly_data=json.dumps(monthly_data)
+    )
+
 if __name__ == '__main__':
     app.run(debug=True)

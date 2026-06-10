@@ -40,6 +40,7 @@ python app.py
 ```
 - **Model Comparison:** `http://127.0.0.1:5000/accidents`
 - **Interactive Map:** `http://127.0.0.1:5000/map`
+- **Dashboard:** `http://127.0.0.1:5000/dashboard`
 
 ---
 
@@ -55,6 +56,22 @@ An interactive D3.js visualization with two coordinated views:
 - **Zoom & individual markers**: scroll wheel to zoom, drag to pan, or click a region to auto-zoom. At zoom level ≥ 2.5×, individual accident dots appear (red = fatal, orange = serious, green = slight) with tooltips showing date, severity, speed limit, weather, lighting, and road type. A "Back to overview" button or double-click resets the view.
 - **Time series chart**: monthly total and fatal accident counts with a **brush selector** — drag horizontally to select a time range.
 - **Linked views**: brushing the time series filters the `region_monthly.csv` data by selected months, re-aggregates per region using `d3.rollup()`, recolors all map paths with a 300ms transition, and updates both hover tooltips and the stats panel. Clearing the brush resets to overall totals.
+
+### `/dashboard` – Heatmap & Parallel Coordinates Dashboard
+A coordinated dashboard for exploring temporal and multivariate accident patterns.
+
+- **Hour × Weekday heatmap**: shows accident counts and severity index for each hour of the day across weekdays. Cells are colored by severity intensity, and clicking cells selects filters for linked views.
+- **Parallel coordinates**: displays sampled accident records across 6 dimensions: hour, weekday, severity score, speed limit, dark conditions, and bad weather. Lines are colored by severity and can be brushed per axis to filter.
+- **Linked interactions**: selecting heatmap cells updates the statistics panel and highlights matching parallel-coordinate lines. Brushing in the parallel coordinates updates the filter status and can be used to explore relationships between severity, time, and environmental conditions.
+- **Statistics panel**: shows aggregated totals, average severity index, and fatal accident count for the current selection.
+
+#### Dashboard interactions
+| Action | Effect |
+|---|---|
+| Click heatmap cell | Selects hour×weekday filters and updates summaries |
+| Click multiple cells | Builds combined selection across timeslots |
+| Brush parallel coordinates | Filters accident lines by chosen value ranges |
+| Reset all filters | Clears heatmap selection and PC brushes |
 
 #### Map interactions
 | Action | Effect |
@@ -74,6 +91,8 @@ An interactive D3.js visualization with two coordinated views:
 3. `timeseries.js` draws the chart; the brush callback converts pixel range → date range → month strings, then calls `updateChoroplethByMonths()`
 4. The shared `currentDataMap` variable ensures hover tooltips always reflect the active time selection
 5. `accident_points.json` (30k points: all fatal + serious, sampled slight) is lazy-loaded on first zoom-in
+
+
 
 ---
 

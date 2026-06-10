@@ -138,3 +138,58 @@ pts["date"] = pts["date"].dt.strftime("%Y-%m-%d")
 out_pts = DATA_DIR / "accident_points.json"
 pts.to_json(out_pts, orient="records")
 print(f"Saved accident_points.json → {len(pts)} points ({out_pts.stat().st_size / 1024:.0f} KB)")
+
+# ── Hour × Weekday Heatmap data ──────────────────────────────────────
+print("Building hour × weekday heatmap data...")
+
+df_collisions_only["weekday"] = df_collisions_only["date"].dt.day_name()
+df_collisions_only["hour"] = df_collisions_only["time"].apply(
+    lambda x: pd.to_datetime(x, format="%H:%M", errors="coerce").hour if pd.notna(x) else None
+)
+
+heatmap_data = df_collisions_only.dropna(subset=["hour"]).groupby(["hour", "weekday"]).agg(
+    total_accidents = ("collision_index", "count"),
+    severity_index  = ("severity_score", "sum"),
+    fatal_count     = ("collision_severity", lambda x: (x == "Fatal").sum()),
+    serious_count   = ("collision_severity", lambda x: (x == "Serious").sum()),
+    slight_count    = ("collision_severity", lambda x: (x == "Slight").sum()),
+).reset_index()
+
+heatmap_data["severity_index_per_1000"] = (
+    heatmap_data["severity_index"] / heatmap_data["total_accidents"] * 1000
+).round(2)
+
+weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+heatmap_data["weekday_num"] = heatmap_data["weekday"].apply(lambda x: weekday_order.index(x) if x in weekday_order else -1)
+heatmap_data = heatmap_data.sort_values(["hour", "weekday_num"]).drop("weekday_num", axis=1)
+
+out_heatmap = DATA_DIR / "heatmap_hour_weekday.csv"
+heatmap_data.to_csv(out_heatmap, index=False)
+print(f"Saved heatmap_hour_weekday.csv → {len(heatmap_data)} cells")
+
+# ── Parallel Coordinates data (sample for performance) ──────────────
+print("Building parallel coordinates data...")
+
+pc_sample = df_collisions_only.sample(n=min(5000, len(df_collisions_only)), random_state=42).copy()
+pc_sample["weekday"] = pc_sample["date"].dt.day_name()
+pc_sample["day_of_week_num"] = pc_sample["weekday"].apply(lambda x: weekday_order.index(x) if x in weekday_order else -1)
+
+# Select key numeric and categorical features
+pc_data = pc_sample[[
+    "hour", "day_of_week_num", "severity_score", "speed_limit",
+    "is_dark", "is_bad_weather", "collision_severity", 
+    "road_type_simple", "police_force"
+]].copy()
+
+pc_data.columns = ["hour", "day_of_week", "severity_score", "speed_limit",
+                   "is_dark", "is_bad_weather", "collision_severity",
+                   "road_type", "police_force"]
+
+# Fill missing values
+pc_data["speed_limit"] = pc_data["speed_limit"].fillna(pc_data["speed_limit"].median())
+pc_data["is_dark"] = pc_data["is_dark"].fillna(0)
+pc_data["is_bad_weather"] = pc_data["is_bad_weather"].fillna(0)
+
+out_pc = DATA_DIR / "parallel_coordinates.json"
+pc_data.to_json(out_pc, orient="records")
+print(f"Saved parallel_coordinates.json → {len(pc_data)} records")

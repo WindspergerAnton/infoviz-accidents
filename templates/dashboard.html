@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>InfoVis Dashboard – Hour×Weekday Analysis</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background: white;
+        }
+        
+        .header {
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ccc;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .visualization-panel {
+            background: transparent;
+            border-radius: 0;
+            padding: 0;
+            box-shadow: none;
+        }
+        
+        .visualization-panel h2 {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #333;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 8px;
+        }
+        
+        .visualization-panel p {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 12px;
+            font-style: italic;
+        }
+        
+        #heatmap-container, #pc-container {
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            min-height: 300px;
+        }
+        
+        #heatmap-container svg, #pc-container svg {
+            background: white;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-width: 280px;
+        }
+        
+        #heatmap-tooltip {
+            background: #fff9e6;
+            border-color: #d62728;
+        }
+        
+        #pc-tooltip {
+            background: #f0f4f8;
+            border-color: #2c5aa0;
+        }
+        
+        .statistics-panel {
+            background: transparent;
+            border-radius: 0;
+            padding: 0;
+            box-shadow: none;
+        }
+        
+        .stat-group {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            border-left: 3px solid #2c5aa0;
+        }
+        
+        .stat-group h4 {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        
+        .stat-group p {
+            font-size: 11px;
+            color: #666;
+            margin: 2px 0;
+        }
+        
+        .btn-reset {
+            display: inline-block;
+            padding: 6px 12px;
+            background: #999;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: background 0.3s;
+        }
+        
+        .btn-reset:hover {
+            background: #777;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .info-box {
+            background: #e8f4fd;
+            border-left: 3px solid #2c5aa0;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        
+        .info-box strong {
+            color: #2c5aa0;
+        }
+                
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: steelblue;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>InfoVis VU 2026 – UK Road Accidents</h1>
+    <p>Group 52 – Hour × Weekday Patterns with Parallel Coordinates</p>
+    <a class="nav-link" href="/map">← Back to Interactive Map</a>
+    <a class="nav-link" href="/accidents">→ Model Comparison</a>
+</div>
+
+<div class="dashboard-layout">
+    <!-- LEFT: Heatmap -->
+    <div class="visualization-panel">
+        <h2>Hour × Weekday Heatmap</h2>
+        <p><strong>Interaction:</strong> Click cells to filter | Hover for details</p>
+        <div id="heatmap-container"></div>
+    </div>
+    
+    <!-- RIGHT: Parallel Coordinates -->
+    <div class="visualization-panel">
+        <h2>Parallel Coordinates</h2>
+        <p><strong>Interaction:</strong> Brush axes to filter across dimensions</p>
+        <div id="pc-container"></div>
+    </div>
+    
+    <!-- STATISTICS PANEL -->
+    <div class="visualization-panel full-width">
+        <h2>Linked Statistics & Controls</h2>
+        <div class="info-box">
+            <strong>Filter Status:</strong> <span id="filter-status">No filters active</span>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div class="stat-group">
+                <h4>Total Accidents</h4>
+                <p id="stat-total-accidents">—</p>
+            </div>
+            <div class="stat-group">
+                <h4>Avg Severity Index</h4>
+                <p id="stat-avg-severity">—</p>
+            </div>
+            <div class="stat-group">
+                <h4>Fatal Accidents</h4>
+                <p id="stat-fatal-accidents">—</p>
+            </div>
+        </div>
+        
+        <button class="btn-reset" onclick="resetAllFilters()">Reset All Filters</button>
+    </div>
+</div>
+
+<div id="heatmap-tooltip" class="tooltip"></div>
+<div id="pc-tooltip" class="tooltip"></div>
+
+<!-- Load visualization libraries FIRST -->
+<script src="{{ url_for('static', filename='js/heatmap.js') }}"></script>
+<script src="{{ url_for('static', filename='js/parallel_coordinates.js') }}"></script>
+
+<!-- Main dashboard script -->
+<script>
+    // Give external scripts time to load
+    window.addEventListener('load', function() {
+        console.log("Page fully loaded");
+        initializeDashboard();
+    });
+    
+    function initializeDashboard() {
+        console.log("Initializing dashboard...");
+        
+        const heatmapData = {{ heatmap_data | safe }};
+        const pcData = {{ pc_data | safe }};
+        
+        console.log("Heatmap data available:", heatmapData.length > 0);
+        console.log("PC data available:", pcData.length > 0);
+        
+        // Check if functions are available
+        if (typeof initHeatmap !== 'function') {
+            console.error("initHeatmap not available");
+            setTimeout(initializeDashboard, 1000);
+            return;
+        }
+        if (typeof initParallelCoordinates !== 'function') {
+            console.error("initParallelCoordinates not available");
+            setTimeout(initializeDashboard, 1000);
+            return;
+        }
+        
+        try {
+            console.log("Calling initHeatmap...");
+            initHeatmap(heatmapData);
+            console.log("Heatmap rendered");
+        } catch (e) {
+            console.error("Heatmap error:", e);
+        }
+        
+        try {
+            console.log("Calling initParallelCoordinates...");
+            initParallelCoordinates(pcData);
+            console.log("PC rendered");
+        } catch (e) {
+            console.error("PC error:", e);
+        }
+        
+        try {
+            updateStatistics(heatmapData);
+        } catch (e) {
+            console.error("Stats error:", e);
+        }
+    }
+    
+    function updateStatistics(data) {
+        if (!data || data.length === 0) {
+            document.getElementById("stat-total-accidents").textContent = "—";
+            document.getElementById("stat-avg-severity").textContent = "—";
+            document.getElementById("stat-fatal-accidents").textContent = "—";
+            return;
+        }
+
+        // For heatmap data
+        if (data[0].total_accidents !== undefined) {
+            const total = d3.sum(data, d => d.total_accidents);
+            const avgSeverity = (d3.sum(data, d => d.severity_index) / total).toFixed(1);
+            const fatal = d3.sum(data, d => d.fatal_count);
+
+            document.getElementById("stat-total-accidents").textContent = total.toLocaleString();
+            document.getElementById("stat-avg-severity").textContent = avgSeverity;
+            document.getElementById("stat-fatal-accidents").textContent = fatal.toLocaleString();
+        }
+    }
+
+    function updateFilterStatus(text) {
+        document.getElementById("filter-status").textContent = text;
+    }
+
+    function resetAllFilters() {
+        try {
+            if (typeof selectedCells !== 'undefined') selectedCells.clear();
+            if (typeof pcBrushes !== 'undefined') pcBrushes.clear();
+            d3.selectAll(".heatmap-cell").attr("stroke", "#999").attr("stroke-width", 0.5);
+            d3.selectAll(".pc-path").attr("opacity", 0.5);
+            updateStatistics({{ heatmap_data | safe }});
+            updateFilterStatus("No filters active");
+        } catch (e) {
+            console.error("Reset error:", e);
+        }
+    }
+
+    // Listen for cross-filter events
+    document.addEventListener("heatmapFilterChanged", (event) => {
+        const { selectedCells: cells } = event.detail;
+        const heatmapData = {{ heatmap_data | safe }};
+        
+        if (cells.length === 0) {
+            d3.selectAll(".pc-path").attr("opacity", 0.5);
+            updateStatistics(heatmapData);
+            updateFilterStatus("Heatmap: none");
+        } else {
+            try {
+                filterPCByHeatmap(cells);
+            } catch (e) {
+                console.error("PC filter error:", e);
+            }
+            const hours = Array.from(new Set(cells.map(c => parseInt(c.split("|")[0]))));
+            const weekdays = Array.from(new Set(cells.map(c => c.split("|")[1])));
+            const filtered = heatmapData.filter(d => 
+                hours.includes(d.hour) && weekdays.includes(d.weekday)
+            );
+            updateStatistics(filtered);
+            updateFilterStatus(`Heatmap: ${cells.length} cells selected`);
+        }
+    });
+</script>
+
+</body>
+</html>
